@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motonaico GAME OF THE DEATH</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+
+        body {
+            height: 100vh;
+            background: #b2d8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .contenedor {
+            width: 920px;
+            height: 280px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(#b7d6c7, transparent) #ffe2d1;
+        }
+
+        .moto {
+            width: 84px;
+            height: 84px;
+            position: absolute;
+            bottom: 22px;
+            left: 42px;
+            z-index: 2;
+            background: url('../gixxerconi.png') no-repeat center;
+            background-size: contain;
+        }
+
+        .suelo {
+            width: 200%;
+            height: 42px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            background: url('../suelo.png') repeat-x 0px 0px;
+            background-size: 50% 42px;
+        }
+
+        .mochila {
+            width: 46px;
+            height: 96px;
+            position: absolute;
+            bottom: 16px;
+            background: url('../ubermochila.png') no-repeat center;
+            background-size: contain;
+        }
+
+        .score {
+            width: 100px;
+            height: 30px;
+            position: absolute;
+            top: 5px;
+            right: 15px;
+            z-index: 10;
+            color: #d48871;
+            font-family: Verdana;
+            font-size: 30px;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .game-over {
+            display: none;
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: #7e928b;
+            font-size: 30px;
+            font-family: Verdana;
+            font-weight: 700;
+        }
+
+        #jumpButton {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #d48871;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor">
+        <div class="suelo"></div>
+        <div class="moto"></div>
+        <div class="score">0</div>
+    </div>
+
+    <div class="game-over">Erí entero e malo</div>
+    <button id="jumpButton">Saltar</button>
+
+    <script>
+        var tiempo = new Date();
+        var deltaTime = 0;
+
+        if(document.readyState === "complete" || document.readyState === "interactive"){
+            setTimeout(Init, 1);
+        } else {
+            document.addEventListener("DOMContentLoaded", Init);
+        }
+
+        function Init() {
+            tiempo = new Date();
+            Start();
+            Loop();
+        }
+
+        function Loop() {
+            deltaTime = (new Date() - tiempo) / 1000;
+            tiempo = new Date();
+            Update();
+            requestAnimationFrame(Loop);
+        }
+
+        var sueloY = 22;
+        var velY = 0;
+        var impulso = 900;
+        var gravedad = 2500;
+
+        var motoPosX = 42;
+        var motoPosY = sueloY;
+
+        var sueloX = 0;
+        var velEscenario = 1280 / 3;
+        var gameVel = 1;
+        var score = 0;
+
+        var parado = false;
+        var saltando = false;
+
+        var tiempoHastaObstaculo = 2;
+        var tiempoObstaculoMin = 0.7;
+        var tiempoObstaculoMax = 1.8;
+        var obstaculoPosY = 16;
+        var obstaculos = [];
+
+        var contenedor;
+        var moto;
+        var textoScore;
+        var suelo;
+        var gameOver;
+        var jumpButton;
+
+        function Start() {
+            gameOver = document.querySelector(".game-over");
+            suelo = document.querySelector(".suelo");
+            contenedor = document.querySelector(".contenedor");
+            textoScore = document.querySelector(".score");
+            moto = document.querySelector(".moto");
+            jumpButton = document.getElementById("jumpButton");
+
+            document.addEventListener("keydown", HandleKeyDown);
+
+            // Detección de dispositivo
+            if (/Mobi|Android/i.test(navigator.userAgent)) {
+                // Mostrar botón de salto en dispositivos móviles
+                jumpButton.style.display = "block";
+                jumpButton.addEventListener("click", Saltar);
+            }
+        }
+
+        function Update() {
+            if(parado) return;
+
+            MoverMoto();
+            MoverSuelo();
+            DecidirCrearObstaculos();
+            MoverObstaculos();
+            DetectarColision();
+
+            velY -= gravedad * deltaTime;
+        }
+
+        function HandleKeyDown(ev) {
+            if(ev.keyCode == 32) {
+                Saltar();
+            }
+        }
+
+        function Saltar() {
+            if(motoPosY === sueloY) {
+                saltando = true;
+                velY = impulso;
+            }
+        }
+
+        function MoverMoto() {
+            motoPosY += velY * deltaTime;
+            if(motoPosY < sueloY) {
+                TocarSuelo();
+            }
+            moto.style.bottom = motoPosY + "px";
+        }
+
+        function TocarSuelo() {
+            motoPosY = sueloY;
+            velY = 0;
+            if(saltando) {
+                saltando = false;
+            }
+        }
+
+        function MoverSuelo() {
+            sueloX += CalcularDesplazamiento();
+            suelo.style.left = -(sueloX % contenedor.clientWidth) + "px";
+        }
+
+        function CalcularDesplazamiento() {
+            return velEscenario * deltaTime * gameVel;
+        }
+
+        function Estrellarse() {
+            parado = true;
+        }
+
+        function DecidirCrearObstaculos() {
+            tiempoHastaObstaculo -= deltaTime;
+            if(tiempoHastaObstaculo <= 0) {
+                CrearObstaculo();
+            }
+        }
+
+        function CrearObstaculo() {
+            var obstaculo = document.createElement("div");
+            contenedor.appendChild(obstaculo);
+            obstaculo.classList.add("mochila");
+            obstaculo.style.left = contenedor.clientWidth + "px";
+
+            obstaculos.push(obstaculo);
+            tiempoHastaObstaculo = tiempoObstaculoMin + Math.random() * (tiempoObstaculoMax - tiempoObstaculoMin) / gameVel;
+        }
+
+        function MoverObstaculos() {
+            for (var i = obstaculos.length - 1; i >= 0; i--) {
+                if(obstaculos[i].getBoundingClientRect().left < -obstaculos[i].clientWidth) {
+                    obstaculos[i].parentNode.removeChild(obstaculos[i]);
+                    obstaculos.splice(i, 1);
+                    GanarPuntos();
+                } else {
+                    obstaculos[i].style.left = (parseFloat(obstaculos[i].style.left) - CalcularDesplazamiento()) + "px";
+                }
+            }
+        }
+
+        function GanarPuntos() {
+            score++;
+            textoScore.innerText = score;
+            if(score == 5) {
+                gameVel = 1.5;
+            } else if(score == 10) {
+                gameVel = 2;
+            } else if(score == 20) {
+                gameVel = 3;
+            }
+            suelo.style.animationDuration = (3 / gameVel) + "s";
+        }
+
+        function GameOver() {
+            Estrellarse();
+            gameOver.style.display = "block";
+            setTimeout(() => {
+                location.reload(); // Reinicia el juego
+            }, 2000); // Espera 2 segundos antes de reiniciar
+        }
+
+        function DetectarColision() {
+            for (var i = 0; i < obstaculos.length; i++) {
+                if(obstaculos[i].getBoundingClientRect().right < moto.getBoundingClientRect().left) {
+                    // Evade obstáculos que están demasiado lejos para colisionar
+                    break;
+                } else {
+                    if(IsCollision(moto, obstaculos[i], 10, 30, 15, 20)) {
+                        GameOver();
+                    }
+                }
+            }
+        }
+
+        function IsCollision(a, b, paddingTop, paddingRight, paddingBottom, paddingLeft) {
+            var aRect = a.getBoundingClientRect();
+            var bRect = b.getBoundingClientRect();
+
+            return !(
+                ((aRect.top + aRect.height - paddingBottom) < (bRect.top)) ||
+                (aRect.top + paddingTop > (bRect.top + bRect.height)) ||
+                ((aRect.left + aRect.width - paddingRight) < bRect.left) ||
+                (aRect.left + paddingLeft > (bRect.left + bRect.width))
+            );
+        }
+    </script>
+</body>
+</html>
